@@ -176,3 +176,40 @@ ol { padding-left: 1.3em; margin: 6px 0; } ol li { margin: 6px 0; } ol.ideas { l
 .panelsheet ol li::before { content: counter(s); position: absolute; left: 0; top: 0; width: 28px; height: 28px; border-radius: 50%; background: var(--c, var(--navy)); color: #fff; font-weight: 700; font-size: .85rem; display: grid; place-items: center; }
 .panelsheet ol.ideas li::before { content: ""; width: 10px; height: 10px; top: 7px; left: 9px; }
 .m-top b { white-space: nowrap; }
+
+/* v1.2: progress page */
+.pcard { background: linear-gradient(160deg, #0b2545 0%, #143a6b 100%); color: #fff; border-radius: 18px; padding: 18px; border: 3px solid #e9b949; box-shadow: 0 4px 14px rgba(11, 37, 69, .25); }
+.pc-head { display: flex; justify-content: space-between; align-items: center; gap: 14px; }
+.pc-head input { background: transparent; border: 0; border-bottom: 2px dashed rgba(255, 255, 255, .45); border-radius: 0; color: #fff; font-size: 1.6rem; font-weight: 800; padding: 2px 0; width: 100%; max-width: 320px; }
+.pc-head input::placeholder { color: #a9c0de; } .pc-head p { margin: 6px 0 0; color: #cfe0f5; font-size: .88rem; }
+.ovr { flex: 0 0 auto; width: 84px; height: 84px; border-radius: 50%; background: #ffd166; color: #0b2545; display: grid; place-content: center; text-align: center; border: 4px solid #fff; }
+.ovr b { font-size: 2rem; line-height: 1; } .ovr span { font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
+.pc-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 6px 28px; margin-top: 12px; }
+.pcard h3 { color: #ffd166; margin: 8px 0 4px; }
+.rate { display: grid; grid-template-columns: 132px 1fr 30px; align-items: center; gap: 10px; margin: 7px 0; font-weight: 600; }
+.rate .bar { margin: 0; height: 10px; background: rgba(255, 255, 255, .22); } .rate .bar i { background: #ffd166; } .rate b { text-align: right; font-variant-numeric: tabular-nums; }
+.pc-note { font-size: .78rem; color: #cfe0f5; margin: 10px 0 0; }
+.rings { display: grid; grid-template-columns: repeat(auto-fit, minmax(104px, 1fr)); gap: 8px; }
+.ring { background: var(--card); border: 1px solid var(--line); border-radius: var(--r); padding: 10px 6px 8px; text-align: center; }
+.ring svg { width: 84px; height: 84px; display: block; margin: 0 auto; } .ring span { font-weight: 700; font-size: .9rem; }
+.ring-n { font: 800 17px -apple-system, "Segoe UI", sans-serif; text-anchor: middle; fill: var(--ink); }
+.ring.full { background: #f0faf4; border-color: #bfe3cf; } .ring.full span { color: #17633f; }
+.totals { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
+.total { background: var(--card); border: 1px solid var(--line); border-top: 6px solid var(--c); border-radius: var(--r); padding: 12px; display: grid; }
+.total .t-label { font-weight: 700; } .total b { font-size: 2.1rem; line-height: 1.1; font-variant-numeric: tabular-nums; color: var(--c); }
+.total .t-unit { font-size: .82rem; color: var(--mute); margin-top: -2px; } .total small { color: var(--mute); font-size: .76rem; margin-top: 4px; }
+.calwrap { display: flex; gap: 5px; min-width: max-content; }
+.calcol { display: grid; grid-template-rows: 16px repeat(7, 30px) 16px; gap: 5px; justify-items: center; }
+.callabels span { font-size: .72rem; color: var(--mute); align-self: center; justify-self: end; padding-right: 4px; }
+.calmonth { font-size: .72rem; font-weight: 700; color: var(--mute); } .calstar { color: #e9a400; font-size: .85rem; line-height: 16px; }
+.cal { width: 30px; height: 30px; border-radius: 7px; display: inline-grid; place-items: center; font-size: 13px; font-weight: 800; color: #fff; text-align: center; padding: 0; }
+.cal.l0 { background: #fff; border: 1.5px solid #b9c8d8; } .cal.l1 { background: #c5d7ee; } .cal.l2 { background: #86a9d8; } .cal.l3 { background: #3f6fb0; } .cal.l4 { background: #0b2545; }
+.cal.future { background: transparent; border: 1.5px dashed #d5e0ea; } .cal.now { box-shadow: 0 0 0 2.5px var(--red); }
+.callegend { font-size: .78rem; color: var(--mute); display: flex; flex-wrap: wrap; align-items: center; gap: 5px; margin: 12px 0 0; }
+.callegend .cal { width: 18px; height: 18px; border-radius: 5px; font-size: 10px; }
+.shelves { display: grid; gap: 10px; }
+.shelf { background: var(--card); border: 1px solid var(--line); border-left: 6px solid var(--c); border-radius: var(--r); padding: 12px; }
+.shelf h3 { color: var(--c); margin: 0 0 8px; font-size: .9rem; } .shelf h3 small { color: var(--mute); }
+.shelf .badges { grid-template-columns: repeat(auto-fill, minmax(136px, 1fr)); }
+.shelf .badge { padding: 10px; } .shelf .badge b { font-size: .92rem; }
+.panel h3 { margin: 16px 0 6px; }

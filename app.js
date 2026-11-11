@@ -107,6 +107,15 @@ function weekStats(w) {
   return s;
 }
 
+function bestRun(set) {
+  let best = 0, run = 0, prev = null;
+  for (const wk of [...set].sort()) {
+    run = prev && addDays(prev, 7) === wk ? run + 1 : 1;
+    best = Math.max(best, run); prev = wk;
+  }
+  return best;
+}
+
 function allStats() {
   const now = thisWeek();
   const keys = Object.keys(state.weeks).filter((k) => k <= now).sort();
@@ -141,35 +150,127 @@ function allStats() {
   let streak = 0, k = now;
   if (!fullSet.has(k)) k = addDays(k, -7);
   while (fullSet.has(k)) { streak++; k = addDays(k, -7); }
-  let best = 0, run = 0, prev = null;
-  for (const wk of [...fullSet].sort()) {
-    run = prev && addDays(prev, 7) === wk ? run + 1 : 1;
-    best = Math.max(best, run); prev = wk;
+  const best = bestRun(fullSet);
+  const byCat = { puck: 0, athlete: 0, iq: 0 }, bySub = {};
+  for (const [id, n] of Object.entries(tried)) { byCat[DRILL_BY_ID[id].cat] += n; bySub[DRILL_BY_ID[id].sub] = (bySub[DRILL_BY_ID[id].sub] || 0) + n; }
+  // Lifetime totals, per-day completion and per-subject streaks
+  const life = {}, days = {}, met = {}, subStreak = {};
+  METERS.forEach((t) => { life[t] = { n: 0, mins: 0 }; met[t] = new Set(); });
+  for (const k of keys) {
+    const w = state.weeks[k], ws = weekStats(w);
+    for (const it of w.items) {
+      const dk = addDays(k, it.day), d = (days[dk] = days[dk] || { done: 0, total: 0 });
+      d.total++;
+      if (it.done) { d.done++; if (life[it.type]) { life[it.type].n++; life[it.type].mins += it.mins || 0; } }
+    }
+    METERS.forEach((t) => { if (ws[t].target > 0 && ws[t].done >= ws[t].target) met[t].add(k); });
   }
-  const byCat = { puck: 0, athlete: 0, iq: 0 };
-  for (const [id, n] of Object.entries(tried)) byCat[DRILL_BY_ID[id].cat] += n;
-  return { tried, triedCount: Object.keys(tried).length, sessions, mins, shots, balanced, fullWeeks, streak, bestStreak: best, quizzes, bests, lvl3, byCat, keys };
+  METERS.forEach((t) => { subStreak[t] = bestRun(met[t]); });
+  return { bySub, life, days, subStreak, fullSet, tried, triedCount: Object.keys(tried).length, sessions, mins, shots, balanced, fullWeeks, streak, bestStreak: best, quizzes, bests, lvl3, byCat, keys };
 }
 
-function badges(st) {
+function trophies(st) {
+  const L = st.life, hrs = (t) => L[t].mins / 60;
+  const g = (name, type, items) => ({ name, type, items: items.map(([n, how, earned]) => ({ name: n, how, earned: !!earned })) });
   return [
-    ['First Shift', 'Finish your first training session', st.sessions >= 1],
-    ['10 Sessions', 'Finish 10 training sessions', st.sessions >= 10],
-    ['25 Sessions', 'Finish 25 training sessions', st.sessions >= 25],
-    ['50 Sessions', 'Finish 50 training sessions', st.sessions >= 50],
-    ['Explorer', 'Try 10 different drills', st.triedCount >= 10],
-    ['Deep Bench', 'Try 30 different drills', st.triedCount >= 30],
-    ['Balanced Week', 'Puck, Athlete and Hockey IQ in one week', st.balanced],
-    ['500 Shots', 'Log 500 shots', st.shots >= 500],
-    ['1,000 Shots', 'Log 1,000 shots', st.shots >= 1000],
-    ['2,500 Shots', 'Log 2,500 shots', st.shots >= 2500],
-    ['5,000 Shots', 'Log 5,000 shots', st.shots >= 5000],
-    ['Full Week', 'Fill every bar in one week', st.fullWeeks >= 1],
-    ['Four in a Row', 'Four full weeks in a row', st.bestStreak >= 4],
-    ['Student of the Game', 'Answer 8 Hockey IQ questions correctly', st.quizzes >= 8],
-    ['Record Keeper', 'Log a personal best on 5 drills', st.bests >= 5],
-    ['Level 3', 'Reach level 3 on any drill', st.lvl3],
-  ].map(([name, how, earned]) => ({ name, how, earned }));
+    g('Cello', 'cello', [['First Notes', '10 cello practices', L.cello.n >= 10], ['In Tune', '25 cello practices', L.cello.n >= 25], ['Virtuoso', '50 cello practices', L.cello.n >= 50], ['Concert Ready', '100 cello practices', L.cello.n >= 100], ['Steady Bow', 'Hit the cello minimum 4 weeks in a row', st.subStreak.cello >= 4]]),
+    g('Math', 'math', [['Warmed Up', '10 math practices', L.math.n >= 10], ['Problem Solver', '25 math practices', L.math.n >= 25], ['Mathlete', '50 math practices', L.math.n >= 50], ['On a Roll', 'Hit the math minimum 4 weeks in a row', st.subStreak.math >= 4]]),
+    g('Writing', 'writing', [['First Draft', '5 writing practices', L.writing.n >= 5], ['Author', '10 writing practices', L.writing.n >= 10], ['Novelist', '25 writing practices', L.writing.n >= 25], ['Deadline Keeper', 'Write 4 weeks in a row', st.subStreak.writing >= 4]]),
+    g('Reading', 'reading', [['Bookworm', '10 hours of reading', hrs('reading') >= 10], ['Page Turner', '25 hours of reading', hrs('reading') >= 25], ['Library Card Legend', '50 hours of reading', hrs('reading') >= 50], ['Every Single Day', 'Read all 7 days, 4 weeks in a row', st.subStreak.reading >= 4]]),
+    g('Chores', 'chore', [['Helping Hand', '10 chores done', L.chore.n >= 10], ['Household Hero', '30 chores done', L.chore.n >= 30], ['Nothing Missed', 'Every chore done 4 weeks in a row', st.subStreak.chore >= 4]]),
+    g('Hockey', 'hockey', [['First Shift', 'Finish your first training session', st.sessions >= 1], ['10 Sessions', 'Finish 10 training sessions', st.sessions >= 10], ['25 Sessions', 'Finish 25 training sessions', st.sessions >= 25], ['50 Sessions', 'Finish 50 training sessions', st.sessions >= 50],
+      ['Explorer', 'Try 10 different drills', st.triedCount >= 10], ['Deep Bench', 'Try 30 different drills', st.triedCount >= 30], ['Balanced Week', 'Puck, Athlete and Hockey IQ in one week', st.balanced],
+      ['500 Shots', 'Log 500 shots', st.shots >= 500], ['1,000 Shots', 'Log 1,000 shots', st.shots >= 1000], ['2,500 Shots', 'Log 2,500 shots', st.shots >= 2500], ['5,000 Shots', 'Log 5,000 shots', st.shots >= 5000],
+      ['Student of the Game', 'Answer 8 Hockey IQ questions correctly', st.quizzes >= 8], ['Record Keeper', 'Log a personal best on 5 drills', st.bests >= 5], ['Level 3', 'Reach level 3 on any drill', st.lvl3]]),
+    g('All-Round', 'team', [['Full Week', 'Fill every ring in one week', st.fullWeeks >= 1], ['Four in a Row', 'Four full weeks in a row', st.bestStreak >= 4], ['Eight in a Row', 'Eight full weeks in a row', st.bestStreak >= 8], ['Ten Full Weeks', 'Ten full weeks in total', st.fullWeeks >= 10]]),
+  ];
+}
+
+// Ratings start at 40 and climb toward 99 as work piles up; early sessions move them fastest.
+function ratings(st) {
+  const r = (points, k) => Math.min(99, Math.round(40 + 59 * (1 - Math.exp(-points / k))));
+  const s = (name) => st.bySub[name] || 0, L = st.life;
+  const iq = st.byCat.iq + st.quizzes;
+  const ice = [['Hands', r(s('Stickhandling'), 40)], ['Shot', r(s('Shooting') + st.shots / 50, 60)], ['Passing', r(s('Passing'), 25)], ['Athlete', r(st.byCat.athlete, 50)], ['Hockey IQ', r(iq, 30)]];
+  const off = [['Musician', r(L.cello.n, 60)], ['Mathematician', r(L.math.n, 45)], ['Writer', r(L.writing.n, 15)], ['Reader', r(L.reading.n, 100)], ['Teammate at Home', r(L.chore.n, 45)]];
+  const all = [...ice, ...off];
+  return { ice, off, overall: Math.round(all.reduce((a, [, v]) => a + v, 0) / all.length) };
+}
+
+function ring(type, label, done, target, center) {
+  const c = 2 * Math.PI * 30, pct = target ? Math.min(1, done / target) : 0, full = target > 0 && done >= target;
+  return `<div class="ring t-${type} ${full ? 'full' : ''}" role="img" aria-label="${label}: ${done} of ${target} done">
+    <svg viewBox="0 0 80 80" aria-hidden="true"><circle cx="40" cy="40" r="30" fill="none" stroke="#dfe7ef" stroke-width="9"/>
+    <circle cx="40" cy="40" r="30" fill="none" style="stroke:var(--c)" stroke-width="9" stroke-linecap="round" stroke-dasharray="${(c * pct).toFixed(1)} ${c.toFixed(1)}" transform="rotate(-90 40 40)"/>
+    <text x="40" y="46" class="ring-n">${center}</text></svg><span>${label}${full ? ' ✓' : ''}</span></div>`;
+}
+
+const MILES_H = [1, 5, 10, 25, 50, 100, 250, 500], MILES_N = [10, 25, 50, 100, 250, 500, 1000];
+function totalTile(type, label, value, unit, miles) {
+  const next = miles.find((m) => m > value) || miles[miles.length - 1];
+  const shown = unit === 'hours' ? (value < 10 ? value.toFixed(1) : Math.round(value)) : Math.round(value).toLocaleString();
+  return `<div class="total t-${type}"><span class="t-label">${label}</span><b>${shown}</b><span class="t-unit">${unit}</span>
+    <div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="${next}" aria-valuenow="${Math.round(value)}" aria-label="${label} toward ${next} ${unit}"><i style="width:${Math.min(100, (value / next) * 100)}%"></i></div>
+    <small>Next: ${next.toLocaleString()} ${unit}</small></div>`;
+}
+
+function calendar(st) {
+  const now = thisWeek(), today = iso(new Date());
+  const weeks = Array.from({ length: 12 }, (_, i) => addDays(now, (i - 11) * 7));
+  const cols = weeks.map((k, wi) => {
+    const first = wi === 0 || parseKey(k).getMonth() !== parseKey(weeks[wi - 1]).getMonth();
+    const cells = DAYS.map((d, i) => {
+      const dk = addDays(k, i), rec = st.days[dk];
+      if (dk > today) return '<span class="cal future"></span>';
+      if (!rec || !rec.total) return `<button class="cal l0" data-a="daytip" data-t="${DAYS_LONG[i]} ${shortDate(dk)}: nothing planned" aria-label="${DAYS_LONG[i]} ${shortDate(dk)}: nothing planned"></button>`;
+      const f = rec.done / rec.total, lvl = f === 0 ? 0 : f <= 0.34 ? 1 : f <= 0.67 ? 2 : f < 1 ? 3 : 4;
+      const tip = `${DAYS_LONG[i]} ${shortDate(dk)}: ${rec.done} of ${rec.total} done`;
+      return `<button class="cal l${lvl} ${dk === today ? 'now' : ''}" data-a="daytip" data-t="${tip}" aria-label="${tip}">${lvl === 4 ? '✓' : ''}</button>`;
+    }).join('');
+    return `<div class="calcol"><span class="calmonth">${first ? MONTHS[parseKey(k).getMonth()] : ''}</span>${cells}<span class="calstar" ${st.fullSet.has(k) ? 'title="Full week"' : ''}>${st.fullSet.has(k) ? '★' : ''}</span></div>`;
+  }).join('');
+  return `<div class="calwrap"><div class="calcol callabels"><span class="calmonth"></span>${DAYS.map((d) => `<span>${d}</span>`).join('')}<span class="calstar"></span></div>${cols}</div>
+    <p class="callegend">Less <span class="cal l0"></span><span class="cal l1"></span><span class="cal l2"></span><span class="cal l3"></span><span class="cal l4">✓</span> Everything done &nbsp;·&nbsp; ★ full week &nbsp;·&nbsp; tap a day for details</p>`;
+}
+
+function renderProgress() {
+  const st = allStats(), s = weekStats(getWeek(thisWeek())), R = ratings(st), L = st.life;
+  const next = SHOT_GOALS.find((g) => g > st.shots) || SHOT_GOALS[SHOT_GOALS.length - 1];
+  const totalCat = Math.max(1, st.byCat.puck + st.byCat.athlete + st.byCat.iq);
+  const bests = DRILLS.filter((d) => d.measure && (state.drill[d.id] || {}).best != null)
+    .map((d) => `<li><span>${esc(d.measure.label)}</span><b>${state.drill[d.id].best} ${esc(d.measure.unit)}</b></li>`).join('');
+  const rate = ([name, v]) => `<div class="rate"><span>${name}</span><div class="bar" role="progressbar" aria-valuemin="40" aria-valuemax="99" aria-valuenow="${v}" aria-label="${name} rating"><i style="width:${((v - 40) / 59) * 100}%"></i></div><b>${v}</b></div>`;
+  const shelf = trophies(st).map((g) => {
+    const got = g.items.filter((i) => i.earned).length;
+    return `<div class="shelf t-${g.type}"><h3>${g.name} <small>${got} of ${g.items.length}</small></h3><div class="badges">${g.items.map((b) => `<div class="badge ${b.earned ? 'earned' : ''}"><span class="star" aria-hidden="true">★</span><b>${b.name}</b><small>${b.how}${b.earned ? '' : ' (locked)'}</small></div>`).join('')}</div></div>`;
+  }).join('');
+  return `<section class="pcard">
+      <div class="pc-head"><div><label class="sr" for="pname">Your name</label><input id="pname" data-f="name" maxlength="24" placeholder="Your name" value="${esc(state.settings.name || '')}" autocomplete="off">
+        <p>${st.streak > 0 ? `${st.streak}-week streak` : 'No streak yet'} · best ${st.bestStreak} · ${st.fullWeeks} full week${st.fullWeeks === 1 ? '' : 's'}</p></div>
+        <div class="ovr" role="img" aria-label="Overall rating ${R.overall}"><b>${R.overall}</b><span>overall</span></div></div>
+      <div class="pc-cols"><div><h3>On the ice</h3>${R.ice.map(rate).join('')}</div><div><h3>Off the ice</h3>${R.off.map(rate).join('')}</div></div>
+      <p class="pc-note">Ratings start at 40 and rise toward 99 with every practice, session and chore you finish.</p>
+    </section>
+    <h2>This week</h2>
+    <section class="rings">${METERS.map((t) => ring(t, SUBJECTS[t].label, s[t].done, s[t].target, `${s[t].done}/${s[t].target}`)).join('')}${ring('hockey', 'Hockey', s.hockey.done, s.hockey.planned, `${s.hockey.done}/${s.hockey.planned}`)}</section>
+    <h2>Lifetime totals</h2>
+    <section class="totals">
+      ${totalTile('reading', 'Reading', L.reading.mins / 60, 'hours', MILES_H)}${totalTile('cello', 'Cello', L.cello.mins / 60, 'hours', MILES_H)}
+      ${totalTile('math', 'Math', L.math.mins / 60, 'hours', MILES_H)}${totalTile('writing', 'Writing', L.writing.mins / 60, 'hours', MILES_H)}
+      ${totalTile('chore', 'Chores', L.chore.n, 'done', MILES_N)}${totalTile('hockey', 'Hockey training', st.mins / 60, 'hours', MILES_H)}
+    </section>
+    <h2>Last 12 weeks</h2>
+    <section class="panel scroll">${calendar(st)}</section>
+    <h2>Trophy shelf</h2>
+    <section class="shelves">${shelf}</section>
+    <h2>Hockey details</h2>
+    <section class="panel"><div class="m-top"><span>${st.shots.toLocaleString()} shots logged</span><b>Next goal: ${next.toLocaleString()}</b></div>
+      <div class="bar tall t-hockey"><i style="width:${Math.min(100, (st.shots / next) * 100)}%"></i></div>
+      <p class="fine">${st.sessions} sessions · ${st.triedCount} of ${DRILLS.length} drills tried. Add shots inside a hockey session on My Week.</p>
+      <h3>Training balance</h3>
+      ${Object.entries(CATS).map(([k, c]) => `<div class="balrow"><span>${c.label}</span><div class="bar c-${k}"><i style="width:${(st.byCat[k] / totalCat) * 100}%"></i></div><b>${st.byCat[k]}</b></div>`).join('')}
+      <h3>Personal bests</h3>
+      ${bests ? `<ul class="bests">${bests}</ul>` : '<p class="fine">Open a drill with a score, like Four Corners or Figure 8s, and log your result.</p>'}</section>`;
 }
 
 /* ───────── Diagrams ───────── */
@@ -344,38 +445,6 @@ function renderDrills() {
     <div class="chips">${subs.map((s) => `<button class="chip ${ui.sub === s ? 'on' : ''}" data-a="sub" data-sub="${esc(s)}">${esc(s)}</button>`).join('')}</div>
     <section class="cards">${cards}</section>
     <p class="fine">Drills follow USA Hockey's 10U guidance: mostly skills, plenty of athletic variety, and a little hockey sense. More at <a href="https://www.usahockey.com/dryland" target="_blank" rel="noopener">usahockey.com/dryland</a>.</p>`;
-}
-
-function renderProgress() {
-  const st = allStats(), s = weekStats(getWeek(thisWeek()));
-  const next = SHOT_GOALS.find((g) => g > st.shots) || SHOT_GOALS[SHOT_GOALS.length - 1];
-  const totalCat = Math.max(1, st.byCat.puck + st.byCat.athlete + st.byCat.iq);
-  const bests = DRILLS.filter((d) => d.measure && (state.drill[d.id] || {}).best != null)
-    .map((d) => `<li><span>${esc(d.measure.label)}</span><b>${state.drill[d.id].best} ${esc(d.measure.unit)}</b></li>`).join('');
-  const recent = st.keys.slice(-8).reverse().map((k) => {
-    const ws = weekStats(state.weeks[k]);
-    return `<tr><th scope="row">${shortDate(k)}</th>${METERS.map((t) => `<td class="${ws[t].done >= ws[t].target ? 'yes' : ''}">${ws[t].done}/${ws[t].target}</td>`).join('')}<td>${ws.hockey.done}</td><td>${ws.full ? '★' : ''}</td></tr>`;
-  }).join('');
-  return `<section class="statrow">
-      <div class="stat big"><b>${st.streak}</b><span>full weeks in a row</span><small>Best: ${st.bestStreak}</small></div>
-      <div class="stat"><b>${st.sessions}</b><span>training sessions</span></div>
-      <div class="stat"><b>${st.mins}</b><span>minutes trained</span></div>
-      <div class="stat"><b>${st.triedCount}<small>/${DRILLS.length}</small></b><span>drills tried</span></div>
-    </section>
-    <h2>This week</h2>${meters(s)}
-    <h2>Shot counter</h2>
-    <section class="panel"><div class="m-top"><span>${st.shots.toLocaleString()} shots logged</span><b>Next goal: ${next.toLocaleString()}</b></div>
-      <div class="bar tall"><i style="width:${Math.min(100, (st.shots / next) * 100)}%"></i></div>
-      <p class="fine">Add shots inside any hockey training session on My Week.</p></section>
-    <h2>Training balance</h2>
-    <section class="panel">${Object.entries(CATS).map(([k, c]) => `<div class="balrow"><span>${c.label}</span><div class="bar c-${k}"><i style="width:${(st.byCat[k] / totalCat) * 100}%"></i></div><b>${st.byCat[k]}</b></div>`).join('')}
-      <p class="fine">Aim for mostly Puck & Ball, a steady amount of Athlete work, and a little Hockey IQ each week.</p></section>
-    <h2>Personal bests</h2>
-    <section class="panel">${bests ? `<ul class="bests">${bests}</ul>` : '<p class="fine">Open a drill with a score, like Four Corners or Figure 8s, and log your result.</p>'}</section>
-    <h2>Badges</h2>
-    <section class="badges">${badges(st).map((b) => `<div class="badge ${b.earned ? 'earned' : ''}"><span class="star" aria-hidden="true">★</span><b>${b.name}</b><small>${b.how}</small></div>`).join('')}</section>
-    <h2>Recent weeks</h2>
-    <section class="panel scroll"><table><thead><tr><th>Week</th>${METERS.map((t) => `<th>${SUBJECTS[t].label}</th>`).join('')}<th>Hockey</th><th>Full</th></tr></thead><tbody>${recent}</tbody></table></section>`;
 }
 
 function renderSettings() {
@@ -555,7 +624,7 @@ const A = {
   toggle(d) {
     const it = findItem(ui.weekKey, d.id); if (!it) return;
     it.done = !it.done; save(); render();
-    if (it.done && weekStats(getWeek(ui.weekKey)).full) toast('Every bar is full. That is a full week!');
+    if (it.done && weekStats(getWeek(ui.weekKey)).full) toast('Everything is done. That is a full week!');
   },
   open(d) { ui.draft = null; ui.sheet = { kind: 'item', id: d.id }; renderSheet(); },
   add(d) { ui.draft = null; ui.sheet = { kind: 'add', day: Number(d.day), slot: d.slot }; renderSheet(); },
@@ -637,6 +706,7 @@ const A = {
     a.href = URL.createObjectURL(blob); a.download = `hockey-planner-backup-${iso(new Date())}.json`;
     document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
   },
+  daytip(d) { toast(d.t); },
   importok() { const s = ui.sheet.payload; ui.sheet = null; adopt(s); toast('Backup file loaded.'); },
 };
 
@@ -655,6 +725,7 @@ document.addEventListener('click', (e) => {
 document.addEventListener('input', (e) => {
   const f = e.target.dataset.f;
   if (f === 'review') { getWeek(ui.weekKey).review[e.target.dataset.k] = e.target.value; save(); }
+  if (f === 'name') { state.settings.name = e.target.value.trim(); save(); }
 });
 document.addEventListener('change', (e) => {
   const f = e.target.dataset.f;
