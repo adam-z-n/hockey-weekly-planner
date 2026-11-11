@@ -65,7 +65,7 @@ const DRILLS = [
     cue: 'Keep your feet still and let your hands do the travelling.',
     levels: ['Cones close together, eyes down.', 'Cones a full stick-length apart so you have to reach. Eyes up.', 'Time 10 clean figure 8s. A touched cone adds a second.'],
     measure: { label: 'Fastest 10 figure 8s', unit: 'seconds', lower: true },
-    diagram: { view: 'floor', cones: [[80, 60], [120, 60]], you: [100, 100], arrows: [{ path: 'M100 78 C 60 78, 60 42, 100 60 C 140 78, 140 42, 100 42', dashed: true }] },
+    diagram: { view: 'floor', cones: [[80, 60], [120, 60]], you: [100, 100], balls: [[100, 60]], arrows: [{ path: 'M100 60 C 100 38, 60 38, 60 60 C 60 82, 100 82, 100 60 C 100 38, 140 38, 140 60 C 140 82, 104 82, 101 64', dashed: true }] },
   },
   {
     id: 'sh-toedrag', cat: 'puck', sub: 'Stickhandling', title: 'Toe Drag', mins: 5,
@@ -979,3 +979,66 @@ const DRILLS = [
     watch: 'Notice how long your shifts feel compared with how long they really are.',
   },
 ];
+
+/* ───────── Pictures for every card ─────────
+   fig view: side-on stick figure (head, body lines, props, balls). net view: shooting targets.
+   floor view: looking down from above. */
+const STAND = ['100,33 100,66', '100,66 95,86 94,105', '100,66 106,86 108,105'];
+const STANCE = { head: [86, 34], body: ['89,43 80,68', '80,68 100,82 92,105', '88,48 104,60 112,66', '88,48 98,64 122,78'], props: ['106,58 152,103 166,103'] };
+const NET4 = (hi) => [[54, 34, '1', hi.includes(1)], [146, 34, '2', hi.includes(2)], [54, 88, '3', hi.includes(3)], [146, 88, '4', hi.includes(4)]];
+const ladder = (x, y, n) => ['' + x + ',' + y + ' ' + (x + n * 22) + ',' + y, '' + x + ',' + (y + 22) + ' ' + (x + n * 22) + ',' + (y + 22)]
+  .concat(Array.from({ length: n + 1 }, (_, i) => (x + i * 22) + ',' + y + ' ' + (x + i * 22) + ',' + (y + 22)));
+
+const ART = {
+  'sh-narrow': { view: 'floor', you: [100, 96], balls: [[100, 58]], arrows: [{ path: 'M82 72 L118 72', both: true }], labels: [[100, 40, 'short, quick touches']] },
+  'sh-wide': { view: 'floor', you: [100, 96], balls: [[38, 60]], arrows: [{ path: 'M46 60 L162 60', both: true }], labels: [[100, 46, 'reach as far as you can']] },
+  'sh-side': { view: 'floor', you: [92, 70], balls: [[130, 40]], arrows: [{ path: 'M130 48 L130 104', both: true }], labels: [[160, 76, 'toe to heel']] },
+  'sh-toedrag': { view: 'floor', you: [100, 104], cones: [[104, 44]], balls: [[124, 84]], arrows: [{ path: 'M124 78 L124 54 C 124 76, 84 80, 84 58 L84 26' }], labels: [[150, 60, 'push out'], [58, 70, 'drag back'], [62, 30, 'go']] },
+  'sh-tophand': { view: 'floor', you: [100, 96], balls: [[84, 62]], arrows: [{ path: 'M90 62 L118 62', both: true }], labels: [[100, 44, 'top hand only']] },
+  'sh-pvc': { view: 'fig', ...STANCE, props: ['106,58 152,103 166,103', '118,69 128,79'], balls: [[172, 100]], labels: [[150, 62, 'pipe slides here']], arrows: [{ path: 'M146 66 L130 72' }] },
+  'sh-eyesup': { view: 'fig', ...STANCE, balls: [[172, 100]], wall: 190, labels: [[180, 30, '3'], [180, 52, '1'], [180, 74, '5']], arrows: [{ path: 'M98 32 L166 30', dashed: true }] },
+  'sh-protect': { view: 'floor', cones: [[100, 60]], you: [136, 60], balls: [[154, 60]], arrows: [{ path: 'M150 48 A40 34 0 1 0 150 74' }], labels: [[100, 80, 'defender']] },
+  'sh-bait': { view: 'floor', cones: [[100, 52]], you: [100, 104], balls: [[94, 92]], arrows: [{ path: 'M90 88 L70 66', fake: true }, { path: 'M72 64 L128 58 L128 26' }], labels: [[46, 76, 'fake'], [150, 44, 'go']] },
+  'sh-juggle': { view: 'fig', ...STANCE, props: ['106,58 150,96 164,92'], balls: [[158, 66]], arrows: [{ path: 'M172 86 L172 52', both: true }] },
+  'sh-oneleg': { view: 'fig', head: [92, 26], body: ['94,35 90,66', '90,66 96,86 92,105', '90,66 76,80 62,74', '93,42 106,56 114,62', '93,42 100,60 124,74'], props: ['108,54 152,103 166,103'], balls: [[172, 100]] },
+  'sht-wrist': { view: 'fig', ...STANCE, balls: [], puck: [150, 101], arrows: [{ path: 'M60 116 L120 116' }], labels: [[90, 16, 'weight: back foot to front foot']] },
+  'sht-targets': { view: 'net', targets: NET4([1, 2, 3, 4]) },
+  'sht-snap': { view: 'net', targets: NET4([3, 4]), labels: [[100, 64, 'quick release']] },
+  'sht-backhand': { view: 'net', targets: NET4([1, 2]), labels: [[100, 64, 'get it up high']] },
+  'sht-quick': { view: 'floor', net: true, you: [100, 106], puck: [88, 88], arrows: [{ path: 'M88 86 L112 78 L88 70 L110 62', dashed: true }, { path: 'M110 60 L101 22' }], labels: [[150, 76, 'handle...'], [136, 40, 'shoot']] },
+  'sht-positions': { view: 'floor', net: true, you: [100, 92], balls: [[100, 76], [148, 86], [124, 66], [76, 106]], arrows: [{ path: 'M100 70 L100 24', dashed: true }, { path: 'M144 80 L112 24', dashed: true }, { path: 'M121 60 L106 24', dashed: true }, { path: 'M78 100 L92 24', dashed: true }], labels: [[160, 104, '4 puck spots']] },
+  'sht-drag': { view: 'floor', net: true, cones: [[122, 58]], you: [96, 104], puck: [140, 86], arrows: [{ path: 'M138 86 C 124 82, 108 88, 100 80' }, { path: 'M100 78 L100 22' }], labels: [[150, 104, 'pull in'], [76, 50, 'release']] },
+  'sht-volume': { view: 'net', targets: [...NET4([1, 2, 3, 4]), [100, 90, '5', true]], labels: [[100, 14, '20 wrist · 15 snap · 15 backhand']] },
+  'ps-forehand': { view: 'floor', you: [28, 60], cones: [[164, 46], [164, 74]], puck: [42, 60], arrows: [{ path: 'M48 60 L158 60', dashed: true }], labels: [[100, 50, 'sweep it through the gate']] },
+  'ps-backhand': { view: 'floor', you: [172, 60], cones: [[36, 46], [36, 74]], puck: [158, 60], arrows: [{ path: 'M152 60 L44 60', dashed: true }], labels: [[100, 50, 'backhand side']] },
+  'ps-saucer': { view: 'fig', props: ['70,104 130,104'], puck: [30, 104], arrows: [{ path: 'M34 100 Q100 30 168 100', dashed: true }], labels: [[100, 98, 'stick on the ground'], [100, 40, 'up, over, and flat']] },
+  'ps-receive': { view: 'floor', you: [36, 60], props: ['170,36 170,84'], arrows: [{ path: 'M48 52 L162 52', dashed: true }, { path: 'M162 68 L50 68', dashed: true }], labels: [[108, 44, 'pass'], [108, 82, 'cushion it'], [170, 26, 'rebounder']] },
+  'ps-feet': { view: 'fig', head: [100, 24], body: [...STAND, '100,38 108,54 116,58', '100,38 104,58 122,70'], props: ['110,52 152,103 166,103'], balls: [[82, 101]], arrows: [{ path: 'M90 112 Q124 122 152 110' }], labels: [[56, 96, 'foot'], [176, 96, 'stick']] },
+  'ps-partner': { view: 'floor', you: [48, 84], players: [[152, 36, 'P', 'us']], arrows: [{ path: 'M58 78 L142 42', dashed: true }, { path: 'M50 72 L50 34' }], labels: [[30, 28, 'then move'], [112, 72, 'pass']] },
+  'at-warmup': { view: 'fig', head: [100, 22], body: ['100,31 100,64', '100,64 126,74 126,105', '100,64 88,96 62,102', '100,38 124,36', '100,38 78,44'], arrows: [{ path: 'M132 30 Q142 44 130 54' }] },
+  'at-hips': { view: 'fig', head: [102, 24], body: ['102,33 100,66', '100,66 128,76 128,105', '100,66 84,102 58,104', '101,40 118,14', '101,40 112,60'] },
+  'at-cooldown': { view: 'fig', head: [136, 40], body: ['127,46 90,62', '90,62 93,84 86,105', '90,62 142,105', '123,50 136,90'], labels: [[60, 40, 'hinge at the hips']] },
+  'at-ladder': { view: 'floor', props: ladder(34, 48, 6), arrows: [{ path: 'M16 59 L182 59' }], labels: [[100, 30, 'light, quick feet'], [100, 96, 'one foot, two feet, sideways, in-in-out-out']] },
+  'at-balance': { view: 'fig', head: [100, 22], body: ['100,31 100,64', '100,64 102,84 100,105', '100,64 86,80 72,90', '100,38 126,48', '100,38 74,48'] },
+  'at-skater': { view: 'fig', head: [122, 34], body: ['120,43 106,68', '106,68 124,84 116,105', '106,68 88,82 68,78', '118,48 136,62', '118,48 98,60'], arrows: [{ path: 'M36 96 Q70 40 104 92', dashed: true }], labels: [[60, 46, 'jump sideways'], [150, 96, 'stick it']] },
+  'at-rope': { view: 'fig', head: [100, 20], body: ['100,29 100,62', '100,62 96,82 95,99', '100,62 105,82 106,99', '100,36 120,54', '100,36 80,54'], paths: ['M120 54 C 178 30, 150 -6, 100 4 C 50 -6, 22 30, 80 54'], labels: [[160, 96, 'small jumps']] },
+  'at-lines': { view: 'floor', props: ['100,20 100,100'], you: [70, 60], arrows: [{ path: 'M82 52 Q100 34 118 52' }, { path: 'M118 70 Q100 88 82 70' }], labels: [[100, 112, 'quick hops over the line']] },
+  'at-react': { view: 'fig', head: [80, 24], body: ['80,33 80,66', '80,66 75,86 74,105', '80,66 86,86 88,105', '80,38 108,44', '80,38 78,60'], wall: 180, balls: [[140, 42]], arrows: [{ path: 'M172 38 L150 41', dashed: true }] },
+  'at-juggle3': { view: 'fig', head: [100, 30], body: ['100,39 100,70', '100,70 95,88 94,105', '100,70 106,88 108,105', '100,44 114,60 128,54', '100,44 86,60 72,54'], balls: [[128, 44], [72, 40], [100, 10]], arrows: [{ path: 'M124 34 Q112 12 104 12', dashed: true }] },
+  'at-animal': { view: 'fig', head: [142, 66], body: ['130,72 90,60', '130,72 132,105', '90,60 104,86 80,105'], arrows: [{ path: 'M150 96 L180 96' }], labels: [[60, 30, 'bear crawl']] },
+  'at-starts': { view: 'fig', head: [108, 32], body: ['104,41 88,66', '88,66 110,78 104,100', '88,66 68,84 48,80', '102,46 120,56 128,46', '102,46 84,56 76,68'], arrows: [{ path: 'M134 92 L182 92' }], labels: [[158, 82, 'go!']] },
+  'at-mirror': { view: 'floor', cones: [[40, 60], [160, 60]], you: [100, 84], players: [[100, 36, 'P', 'us']], arrows: [{ path: 'M70 36 L88 36', both: true }, { path: 'M70 84 L88 84', both: true }, { path: 'M112 36 L130 36', both: true }, { path: 'M112 84 L130 84', both: true }], labels: [[100, 108, 'stay in front of your partner']] },
+  'st-squat': { view: 'fig', head: [90, 36], body: ['93,45 78,72', '78,72 108,76 100,105', '92,50 126,50'], arrows: [{ path: 'M56 44 L56 80', both: true }] },
+  'st-lunge': { view: 'fig', head: [100, 22], body: ['100,31 100,64', '100,64 126,74 126,105', '100,64 88,96 62,102', '100,38 110,52 102,62'], arrows: [{ path: 'M148 40 L148 76', both: true }] },
+  'st-wallsit': { view: 'fig', wall: 68, head: [82, 38], body: ['78,47 78,76', '78,76 108,76 108,105', '78,52 94,64'], labels: [[140, 66, 'knees at 90°']] },
+  'st-pushup': { view: 'fig', head: [152, 62], body: ['142,70 96,82 50,102', '142,70 142,104'], arrows: [{ path: 'M168 68 L168 100', both: true }], labels: [[92, 60, 'straight line']] },
+  'st-plank': { view: 'fig', head: [156, 70], body: ['144,76 98,84 50,102', '144,76 142,103 160,103'], labels: [[96, 62, 'flat back, squeeze']] },
+  'st-bridge': { view: 'fig', head: [44, 97], body: ['54,99 96,72 126,72 126,105', '56,101 92,104'], arrows: [{ path: 'M96 98 L96 80' }], labels: [[96, 56, 'hips up, squeeze']] },
+  'st-birddog': { view: 'fig', head: [142, 60], body: ['130,66 86,70', '130,66 130,105', '86,70 86,105 64,105', '130,66 166,58', '86,70 44,68'], labels: [[100, 40, 'opposite arm and leg']] },
+  'st-deadbug': { view: 'fig', head: [44, 95], body: ['54,99 100,99', '100,99 106,70 132,70', '100,99 148,90', '62,99 64,64', '56,99 24,88'], labels: [[110, 30, 'lower back stays down']] },
+  'st-climbers': { view: 'fig', head: [152, 60], body: ['142,68 96,78 50,102', '142,68 142,104', '96,78 124,88 110,102'], arrows: [{ path: 'M92 96 L112 92' }] },
+  'iq-space': { view: 'zone', players: [[40, 110, 'W', 'us'], [120, 128, 'D', 'us'], [78, 92, 'X', 'them']], puck: [100, 124], arrows: [{ path: 'M110 126 L52 112', dashed: true }, { path: 'M36 100 L28 58' }], labels: [[48, 134, 'look first'], [64, 60, 'open ice']] },
+  'iq-faceoff': { view: 'zone', players: [[55, 60, 'C', 'us'], [55, 82, 'X', 'them'], [30, 62, 'W', 'us'], [80, 62, 'W', 'us'], [30, 82, 'X', 'them'], [80, 82, 'X', 'them'], [38, 42, 'D', 'us'], [100, 46, 'D', 'us']], puck: [55, 71] },
+  'iq-habits': { view: 'full', labels: [[150, 56, 'short shifts'], [150, 76, 'change when the puck is deep']], arrows: [{ path: 'M200 96 L262 96' }] },
+};
+for (const d of DRILLS) if (!d.diagram && ART[d.id]) d.diagram = ART[d.id];

@@ -41,12 +41,20 @@ const todayIndex = () => (new Date().getDay() + 6) % 7;
 const uid = () => Math.random().toString(36).slice(2, 10);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
-function freshState() { return { version: 1, weeks: {}, drill: {}, settings: { backupUrl: '' }, updatedAt: 0 }; }
+function freshState() { return { version: 1, weeks: {}, drill: {}, settings: { backupUrl: '', gamePm: true }, updatedAt: 0 }; }
+function migrate(s) {
+  s.drill = s.drill || {}; s.settings = s.settings || { backupUrl: '' };
+  if (!s.settings.gamePm) { // Saturday games now default to the afternoon
+    for (const w of Object.values(s.weeks)) for (const it of w.items || []) if (it.game && it.fixed && !it.done && it.slot === 'am') it.slot = 'pm';
+    s.settings.gamePm = true;
+  }
+  return s;
+}
 function validState(s) { return s && typeof s === 'object' && s.weeks && typeof s.weeks === 'object'; }
 function loadState() {
   try {
     const s = JSON.parse(localStorage.getItem(STORE_KEY));
-    if (validState(s)) { s.drill = s.drill || {}; s.settings = s.settings || { backupUrl: '' }; return s; }
+    if (validState(s)) return migrate(s);
   } catch (e) { /* fall through to a fresh state */ }
   return freshState();
 }
@@ -54,7 +62,7 @@ function loadMeta() { try { return JSON.parse(localStorage.getItem(META_KEY)) ||
 
 let state = loadState();
 let meta = loadMeta();
-const ui = { tab: 'week', weekKey: thisWeek(), cat: 'puck', sub: 'All', sheet: null, pick: null };
+const ui = { tab: 'week', weekKey: thisWeek(), cat: 'puck', sub: 'All', sheet: null, pick: null, draft: null };
 
 function persist() {
   try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) { toast('Could not save. Storage may be full.'); }
@@ -66,7 +74,7 @@ function seedWeek() {
   const items = [];
   const add = (o) => items.push({ id: uid(), done: false, fixed: true, ...o });
   add({ type: 'team', title: 'Hockey practice', day: 0, slot: 'eve' });
-  add({ type: 'team', title: 'Hockey game', day: 5, slot: 'am', game: true });
+  add({ type: 'team', title: 'Hockey game', day: 5, slot: 'pm', game: true });
   for (let d = 0; d < 7; d++) add({ type: 'reading', title: 'Reading', mins: 30, day: d, slot: 'eve' });
   ['Laundry', 'Clean room', 'Take out trash'].forEach((t) => add({ type: 'chore', title: t, day: 6, slot: 'pm' }));
   return { items, review: { good: '', change: '' } };
@@ -77,7 +85,8 @@ function getWeek(key) {
   w.review = w.review || { good: '', change: '' };
   return w;
 }
-const findItem = (key, id) => getWeek(key).items.find((i) => i.id === id);
+const findItem = (key, id) => (ui.draft && ui.draft.id === id ? ui.draft : getWeek(key).items.find((i) => i.id === id));
+const isDraft = (id) => !!ui.draft && ui.draft.id === id;
 
 /* ───────── Stats ───────── */
 function weekStats(w) {
@@ -164,16 +173,20 @@ function badges(st) {
 }
 
 /* ───────── Diagrams ───────── */
-function diagram(spec) {
+function diagram(spec, thumb) {
   if (!spec) return '';
   const defs = '<defs><marker id="arr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#0b2545"/></marker></defs>';
-  const arrows = (spec.arrows || []).map((a) => `<path d="${a.path}" fill="none" stroke="#0b2545" stroke-width="1.6" ${a.dashed ? 'stroke-dasharray="4 3"' : ''} marker-end="url(#arr)"/>`).join('');
+  const arrows = (spec.arrows || []).map((a) => `<path d="${a.path}" fill="none" stroke="${a.fake ? '#c8102e' : '#0b2545'}" stroke-width="1.8" ${a.dashed || a.fake ? 'stroke-dasharray="4 3"' : ''} marker-end="url(#arr)" ${a.both ? 'marker-start="url(#arr)"' : ''}/>`).join('');
   const players = (spec.players || []).map(([x, y, t, team]) => (team === 'us'
     ? `<circle cx="${x}" cy="${y}" r="9" fill="#0b2545"/><text x="${x}" y="${y + 2.8}" class="dg-p" fill="#fff">${t}</text>`
     : `<circle cx="${x}" cy="${y}" r="9" fill="#fff" stroke="#c8102e" stroke-width="1.6"/><text x="${x}" y="${y + 2.8}" class="dg-p" fill="#c8102e">${t}</text>`)).join('');
   const puck = spec.puck ? `<circle cx="${spec.puck[0]}" cy="${spec.puck[1]}" r="3.2" fill="#111"/>` : '';
+  const balls = (spec.balls || []).map(([x, y]) => `<circle cx="${x}" cy="${y}" r="4" fill="#f08a24" stroke="#b85f00" stroke-width="1"/>`).join('');
+  const props = (spec.props || []).map((p) => `<polyline points="${p}" fill="none" stroke="#8a6d3b" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>`).join('')
+    + (spec.paths || []).map((p) => `<path d="${p}" fill="none" stroke="#7d8da0" stroke-width="1.6"/>`).join('');
+  const cones = (spec.cones || []).map(([x, y]) => `<path d="M${x} ${y - 7} L${x + 6} ${y + 5} L${x - 6} ${y + 5} Z" fill="#f08a24"/>`).join('');
   const labels = (spec.labels || []).map(([x, y, t]) => `<text x="${x}" y="${y}" class="dg-l">${esc(t)}</text>`).join('');
-  const key = spec.players ? '<p class="dg-key"><span class="k-us"></span> your team <span class="k-them"></span> other team <span class="k-puck"></span> puck &nbsp; solid arrow: skate &nbsp; dashed: pass</p>' : '';
+  const key = spec.view === 'zone' || spec.view === 'full' ? '<p class="dg-key"><span class="k-us"></span> your team <span class="k-them"></span> other team <span class="k-puck"></span> puck &nbsp; solid arrow: skate &nbsp; dashed: pass</p>' : '';
   let body = '', vb = '0 0 200 170';
   if (spec.view === 'zone') {
     body = `<path d="M4 166 V40 Q4 6 40 6 H160 Q196 6 196 40 V166" fill="#f6fafd" stroke="#0b2545" stroke-width="2"/>
@@ -192,13 +205,28 @@ function diagram(spec) {
       <line x1="150" y1="4" x2="150" y2="126" stroke="#c8102e" stroke-width="3"/>
       <rect x="21" y="58" width="7" height="14" fill="none" stroke="#0b2545" stroke-width="1.2"/><rect x="272" y="58" width="7" height="14" fill="none" stroke="#0b2545" stroke-width="1.2"/>
       <text x="40" y="122" class="dg-l" text-anchor="start">your net</text>`;
+  } else if (spec.view === 'net') {
+    vb = '0 0 200 120';
+    let mesh = '';
+    for (let x = 52; x < 160; x += 12) mesh += `<line x1="${x}" y1="22" x2="${x}" y2="100" stroke="#d5e0ea" stroke-width="1"/>`;
+    for (let y = 34; y < 100; y += 12) mesh += `<line x1="40" y1="${y}" x2="160" y2="${y}" stroke="#d5e0ea" stroke-width="1"/>`;
+    body = `<rect x="2" y="2" width="196" height="116" rx="8" fill="#f6fafd" stroke="#c9d6e2" stroke-width="1.5"/>${mesh}
+      <path d="M40 100 V22 H160 V100" fill="none" stroke="#c8102e" stroke-width="5" stroke-linejoin="round"/><line x1="20" y1="100" x2="180" y2="100" stroke="#c8102e" stroke-width="1.5"/>`
+      + (spec.targets || []).map(([x, y, t, hi]) => `<circle cx="${x}" cy="${y}" r="10" fill="${hi ? '#ffd166' : '#fff'}" stroke="#0b2545" stroke-width="1.6"/><text x="${x}" y="${y + 3}" class="dg-p" fill="#0b2545" style="font-size:9px">${t}</text>`).join('');
+  } else if (spec.view === 'fig') {
+    vb = '0 0 200 120';
+    body = `<rect x="2" y="2" width="196" height="116" rx="8" fill="#f6fafd" stroke="#c9d6e2" stroke-width="1.5"/><line x1="14" y1="107" x2="186" y2="107" stroke="#9fb0c3" stroke-width="2" stroke-linecap="round"/>
+      ${spec.wall ? `<line x1="${spec.wall}" y1="14" x2="${spec.wall}" y2="107" stroke="#9fb0c3" stroke-width="4"/>` : ''}`
+      + (spec.body || []).map((p) => `<polyline points="${p}" fill="none" stroke="#0b2545" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>`).join('')
+      + (spec.head ? `<circle cx="${spec.head[0]}" cy="${spec.head[1]}" r="8.5" fill="#0b2545"/>` : '');
   } else {
     vb = '0 0 200 120';
     body = `<rect x="2" y="2" width="196" height="116" rx="8" fill="#f6fafd" stroke="#c9d6e2" stroke-width="1.5"/>`
-      + (spec.cones || []).map(([x, y]) => `<path d="M${x} ${y - 7} L${x + 6} ${y + 5} L${x - 6} ${y + 5} Z" fill="#f08a24"/>`).join('')
+      + (spec.net ? '<path d="M84 16 V6 H116 V16" fill="#fff" stroke="#c8102e" stroke-width="3" stroke-linejoin="round"/>' : '')
       + (spec.you ? `<circle cx="${spec.you[0]}" cy="${spec.you[1]}" r="8" fill="#0b2545"/><text x="${spec.you[0]}" y="${spec.you[1] + 2.6}" class="dg-p" fill="#fff">You</text>` : '');
   }
-  return `<figure class="dg"><svg viewBox="${vb}" role="img" aria-label="Diagram">${defs}${body}${arrows}${players}${puck}${labels}</svg>${key}</figure>`;
+  const svg = `<svg viewBox="${vb}" ${thumb ? 'aria-hidden="true"' : 'role="img" aria-label="Diagram"'}>${defs}${body}${props}${cones}${arrows}${players}${puck}${balls}${labels}</svg>`;
+  return thumb ? svg : `<figure class="dg">${svg}${key}</figure>`;
 }
 
 /* ───────── Rendering ───────── */
@@ -288,6 +316,8 @@ function renderWeek() {
     </section>`;
 }
 
+const doneTag = (n) => (n ? `<span class="donetag yes">✓ Done ${n} time${n === 1 ? '' : 's'}</span>` : '<span class="donetag">Not tried yet</span>');
+
 function renderDrills() {
   const st = allStats();
   const inCat = DRILLS.filter((d) => d.cat === ui.cat);
@@ -300,8 +330,10 @@ function renderDrills() {
     const n = st.tried[d.id] || 0, lvl = (state.drill[d.id] || {}).level || 1;
     return `<div class="card c-${d.cat}">
       <button class="cardbody" data-a="drill" data-id="${d.id}">
+        <span class="thumb">${diagram(d.diagram, true)}</span>
         <span class="tag">${esc(d.sub)}</span><span class="ttl">${esc(d.title)}</span>
-        <span class="meta">${d.mins} min · Level ${lvl}${n ? ` · done ${n}×` : ''}</span>
+        <span class="meta">${d.mins} min · Level ${lvl}</span>
+        ${doneTag(n)}
       </button>
       ${pickItem ? `<button class="pick ${chosen.includes(d.id) ? 'on' : ''}" data-a="pickdrill" data-id="${d.id}" aria-pressed="${chosen.includes(d.id)}">${chosen.includes(d.id) ? '✓ Added' : '+ Add'}</button>` : ''}
     </div>`;
@@ -398,27 +430,31 @@ function chipRow(action, opts, current, extra = '') {
 function sheetItem({ id }) {
   const it = findItem(ui.weekKey, id);
   if (!it) return '';
+  const draft = isDraft(id);
   const slotOpts = Object.entries(SLOTS).filter(([k]) => k !== 'eve' || it.fixed || it.slot === 'eve');
   let hockey = '';
   if (it.type === 'hockey') {
     const drills = (it.drills || []).map((d) => DRILL_BY_ID[d]).filter(Boolean);
     const total = drills.reduce((a, d) => a + d.mins, 0);
-    hockey = `<h3>Length</h3>${chipRow('setmins', [15, 20, 30, 45].map((m) => [m, `${m} min`]), it.mins)}
+    hockey = `${draft ? '<p class="steps"><b>1</b> Pick a length <b>2</b> Pick your drills <b>3</b> Add to schedule</p>' : ''}
+      <h3>Length</h3>${chipRow('setmins', [15, 20, 30].map((m) => [m, `${m} min`]), it.mins)}
       <h3>Drills${drills.length ? ` <small>about ${total} min</small>` : ''}</h3>
       ${drills.length ? `<ul class="drilllist">${drills.map((d) => `<li class="c-${d.cat}"><button class="link" data-a="drill" data-id="${d.id}" data-back="${it.id}">${esc(d.title)}</button><span>${d.mins} min</span><button class="rm" data-a="rmdrill" data-id="${d.id}" aria-label="Remove ${esc(d.title)}">×</button></li>`).join('')}</ul>` : '<p class="fine">No drills yet. Choose your own or let the planner build a balanced session.</p>'}
-      <div class="row"><button class="btn" data-a="pickstart">Choose drills</button><button class="btn ghost" data-a="autobuild">Build one for me</button></div>
-      <h3>Shots taken</h3>
-      <div class="row shots"><button class="btn ghost" data-a="shots" data-n="-10">−10</button><input type="number" inputmode="numeric" min="0" step="1" data-f="shots" value="${it.shots || 0}" aria-label="Shots taken"><button class="btn ghost" data-a="shots" data-n="10">+10</button><button class="btn ghost" data-a="shots" data-n="25">+25</button></div>`;
+      <div class="row"><button class="btn ghost" data-a="pickstart">Choose drills</button><button class="btn ghost" data-a="autobuild">Build one for me</button></div>
+      ${draft ? '' : `<h3>Shots taken</h3>
+      <div class="row shots"><button class="btn ghost" data-a="shots" data-n="-10">−10</button><input type="number" inputmode="numeric" min="0" step="1" data-f="shots" value="${it.shots || 0}" aria-label="Shots taken"><button class="btn ghost" data-a="shots" data-n="10">+10</button><button class="btn ghost" data-a="shots" data-n="25">+25</button></div>`}`;
   }
-  return `<p class="tag t-${it.type}">${SUBJECTS[it.type].label}</p><h2>${esc(it.title)}</h2>
-    <button class="btn wide ${it.done ? 'ghost' : ''}" data-a="toggle" data-id="${it.id}">${it.done ? 'Done ✓ (tap to undo)' : 'Mark as done'}</button>
+  return `<p class="tag t-${it.type}">${SUBJECTS[it.type].label}${it.done ? ' · done ✓' : ''}</p><h2>${esc(it.title)}</h2>
     ${hockey}
     <h3>Day</h3>${chipRow('setday', DAYS.map((d, i) => [i, d]), it.day)}
     <h3>Time</h3>${chipRow('setslot', slotOpts, it.slot)}
-    <button class="btn danger wide" data-a="delete">Remove from this week</button>`;
+    <div class="confirmbar">
+      <button class="btn wide" data-a="confirmitem">${draft ? `Add to schedule: ${DAYS_LONG[it.day]} ${SLOTS[it.slot].toLowerCase()}` : 'Save and close'}</button>
+      <button class="btn ${draft ? 'ghost' : 'danger'} wide" data-a="${draft ? 'close' : 'delete'}">${draft ? 'Cancel' : 'Remove from this week'}</button>
+    </div>`;
 }
 
-function sheetDrill({ id, quizPick, corner }) {
+function sheetDrill({ id, quizPick, corner, back }) {
   const d = DRILL_BY_ID[id];
   if (!d) return '';
   const rec = state.drill[id] || {};
@@ -436,7 +472,7 @@ function sheetDrill({ id, quizPick, corner }) {
   const measure = d.measure ? `<h3>Personal best</h3><p>${esc(d.measure.label)}: <b>${rec.best != null ? `${rec.best} ${esc(d.measure.unit)}` : 'not logged yet'}</b></p>
     <div class="row"><input type="number" inputmode="decimal" min="0" step="any" id="scoreInput" placeholder="Today's result" aria-label="Today's result"><button class="btn ghost" data-a="score">Log it</button></div>` : '';
   return `<p class="tag c-${d.cat}">${CATS[d.cat].label} · ${esc(d.sub)}</p><h2>${esc(d.title)}</h2>
-    <p class="meta">${d.mins} min${d.gear.length ? ` · You need: ${d.gear.map(esc).join(', ')}` : ''}</p>
+    <div class="glance"><span class="g-time">${d.mins} min</span>${doneTag(allStats().tried[d.id] || 0)}${d.gear.map((g) => `<span class="g-gear">${esc(g)}</span>`).join('')}</div>
     <p class="lead">${esc(d.why)}</p>
     ${diagram(d.diagram)}
     <h3>${isIq ? 'Key ideas' : 'How to do it'}</h3><ol class="${isIq ? 'ideas' : ''}">${d.how.map((h) => `<li>${esc(h)}</li>`).join('')}</ol>
@@ -447,7 +483,7 @@ function sheetDrill({ id, quizPick, corner }) {
     <div class="levels">${d.levels.map((l, i) => `<button class="lvl ${lvl === i + 1 ? 'on' : ''}" data-a="level" data-v="${i + 1}"><b>${i + 1}</b><span>${esc(l)}</span></button>`).join('')}</div>
     ${measure}${quiz}
     ${d.watch ? `<p class="cue"><b>Watch for it</b> ${esc(d.watch)}</p>` : ''}
-    <button class="btn wide" data-a="placestart" data-id="${d.id}">Add to my week</button>`;
+    ${back ? '<button class="btn wide" data-a="close">Back to my session</button>' : `<button class="btn wide" data-a="placestart" data-id="${d.id}">Add to my week</button>`}`;
 }
 
 function sheetPlace({ id }) {
@@ -494,8 +530,22 @@ function buildSession(mins) {
 
 /* ───────── Actions ───────── */
 const A = {
-  tab(d) { ui.tab = d.tab; if (d.tab !== 'drills') ui.pick = null; ui.sheet = null; render(); window.scrollTo(0, 0); },
-  close() { ui.sheet = null; renderSheet(); },
+  tab(d) { ui.tab = d.tab; ui.pick = null; ui.draft = null; ui.sheet = null; render(); window.scrollTo(0, 0); },
+  close() {
+    const sh = ui.sheet;
+    if (sh && sh.kind === 'drill' && sh.back) { ui.sheet = { kind: 'item', id: sh.back }; return renderSheet(); }
+    if (sh && sh.kind === 'item' && isDraft(sh.id)) { ui.draft = null; toast('Not added to the schedule.'); }
+    ui.sheet = null; renderSheet();
+  },
+  confirmitem() {
+    const id = ui.sheet.id;
+    if (isDraft(id)) {
+      const it = ui.draft; ui.draft = null;
+      getWeek(ui.weekKey).items.push(it); save();
+      toast(`Added to ${DAYS_LONG[it.day]} ${SLOTS[it.slot].toLowerCase()}.`);
+    }
+    ui.sheet = null; render();
+  },
   week(d) { const step = Number(d.step); ui.weekKey = step === 0 ? thisWeek() : addDays(ui.weekKey, step * 7); render(); },
   copyweek() {
     const w = getWeek(ui.weekKey), prev = state.weeks[addDays(ui.weekKey, -7)];
@@ -507,14 +557,13 @@ const A = {
     it.done = !it.done; save(); render();
     if (it.done && weekStats(getWeek(ui.weekKey)).full) toast('Every bar is full. That is a full week!');
   },
-  open(d) { ui.sheet = { kind: 'item', id: d.id }; renderSheet(); },
-  add(d) { ui.sheet = { kind: 'add', day: Number(d.day), slot: d.slot }; renderSheet(); },
+  open(d) { ui.draft = null; ui.sheet = { kind: 'item', id: d.id }; renderSheet(); },
+  add(d) { ui.draft = null; ui.sheet = { kind: 'add', day: Number(d.day), slot: d.slot }; renderSheet(); },
   addtype(d) {
     const { day, slot } = ui.sheet, t = d.type;
     const it = { id: uid(), type: t, title: SUBJECTS[t].label, mins: Number(d.mins) || SUBJECTS[t].mins, day, slot, done: false };
-    if (t === 'hockey') { it.drills = []; it.shots = 0; }
-    getWeek(ui.weekKey).items.push(it); save();
-    ui.sheet = t === 'hockey' ? { kind: 'item', id: it.id } : null; render();
+    if (t === 'hockey') { it.drills = []; it.shots = 0; ui.draft = it; ui.sheet = { kind: 'item', id: it.id }; return renderSheet(); }
+    getWeek(ui.weekKey).items.push(it); save(); ui.sheet = null; render();
   },
   addother(d) {
     const title = $('#otherTitle').value.trim();
@@ -546,7 +595,7 @@ const A = {
   pickdone() { const id = ui.pick.id; ui.weekKey = ui.pick.weekKey; ui.pick = null; ui.tab = 'week'; ui.sheet = { kind: 'item', id }; render(); },
   cat(d) { ui.cat = d.cat; ui.sub = 'All'; render(); },
   sub(d) { ui.sub = d.sub; render(); },
-  drill(d) { ui.sheet = { kind: 'drill', id: d.id }; renderSheet(); $('.panelsheet').scrollTop = 0; },
+  drill(d) { ui.sheet = { kind: 'drill', id: d.id, back: d.back || null }; renderSheet(); $('.panelsheet').scrollTop = 0; },
   level(d) { const r = (state.drill[ui.sheet.id] = state.drill[ui.sheet.id] || {}); r.level = Number(d.v); save(); renderKeepScroll(); },
   corner() { const c = ['Top left', 'Top right', 'Bottom left', 'Bottom right']; ui.sheet.corner = c[Math.floor(Math.random() * 4)]; renderKeepScroll(); },
   score() {
@@ -627,7 +676,7 @@ document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && ui.sheet
 /* ───────── Backup to Google Sheet ───────── */
 function adopt(s) {
   const url = state.settings.backupUrl;
-  state = s; state.drill = state.drill || {}; state.settings = state.settings || {};
+  state = migrate(s);
   if (!state.settings.backupUrl) state.settings.backupUrl = url || '';
   persist(); render();
 }
