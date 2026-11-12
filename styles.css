@@ -213,3 +213,8 @@ ol { padding-left: 1.3em; margin: 6px 0; } ol li { margin: 6px 0; } ol.ideas { l
 .shelf .badges { grid-template-columns: repeat(auto-fill, minmax(136px, 1fr)); }
 .shelf .badge { padding: 10px; } .shelf .badge b { font-size: .92rem; }
 .panel h3 { margin: 16px 0 6px; }
+
+/* v1.3 */
+.meter { min-width: 0; } .m-top { flex-wrap: wrap; } .m-top span { min-width: 0; overflow-wrap: anywhere; }
+.undo { min-height: 32px; padding: 0 10px; border-radius: 99px; border: 1.5px solid #b9c8d8; background: #fff; font-size: .8rem; font-weight: 600; color: var(--red); text-align: center; }
+.meter { padding: 10px 9px; } .m-top { gap: 4px; }

@@ -1,5 +1,5 @@
 // Offline support: try the network first so updates arrive, fall back to the saved copy.
-const CACHE = 'hwp-cache-v3';
+const CACHE = 'hwp-cache-v4';
 const SHELL = ['./', 'index.html', 'styles.css', 'drills.js', 'app.js', 'manifest.webmanifest', 'icons/icon.svg', 'icons/icon-180.png', 'icons/icon-512.png'];
 
 self.addEventListener('install', (e) => {

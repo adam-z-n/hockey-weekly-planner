@@ -151,6 +151,11 @@ function allStats() {
   if (!fullSet.has(k)) k = addDays(k, -7);
   while (fullSet.has(k)) { streak++; k = addDays(k, -7); }
   const best = bestRun(fullSet);
+  for (const [id, d] of Object.entries(state.drill)) { // corrections made with "Mark one as not done"
+    if (!d.adj || !DRILL_BY_ID[id]) continue;
+    const n = (tried[id] || 0) + d.adj;
+    if (n > 0) tried[id] = n; else delete tried[id];
+  }
   const byCat = { puck: 0, athlete: 0, iq: 0 }, bySub = {};
   for (const [id, n] of Object.entries(tried)) { byCat[DRILL_BY_ID[id].cat] += n; bySub[DRILL_BY_ID[id].sub] = (bySub[DRILL_BY_ID[id].sub] || 0) + n; }
   // Lifetime totals, per-day completion and per-subject streaks
@@ -358,8 +363,8 @@ function meter(type, s) {
 }
 function meters(s) {
   return `<section class="meters">${METERS.map((t) => meter(t, s)).join('')}
-    <div class="meter t-hockey"><div class="m-top"><span>Hockey</span><b>${s.hockey.done} done</b></div>
-    <div class="m-sub">${s.hockey.planned} planned · ${s.hockey.mins} min${s.hockey.shots ? ` · ${s.hockey.shots} shots` : ''}</div></div></section>`;
+    <div class="meter t-hockey"><div class="m-top"><span>Hockey</span><b>${s.hockey.done}/${s.hockey.planned}</b></div>
+    <div class="m-sub">${s.hockey.mins} min${s.hockey.shots ? ` · ${s.hockey.shots} shots` : ''}</div></div></section>`;
 }
 
 function itemMeta(it) {
@@ -529,6 +534,7 @@ function sheetDrill({ id, quizPick, corner, back }) {
   const rec = state.drill[id] || {};
   const lvl = rec.level || 1;
   const isIq = d.cat === 'iq';
+  const doneN = allStats().tried[d.id] || 0;
   let quiz = '';
   if (d.quiz) {
     const answered = quizPick != null;
@@ -541,7 +547,7 @@ function sheetDrill({ id, quizPick, corner, back }) {
   const measure = d.measure ? `<h3>Personal best</h3><p>${esc(d.measure.label)}: <b>${rec.best != null ? `${rec.best} ${esc(d.measure.unit)}` : 'not logged yet'}</b></p>
     <div class="row"><input type="number" inputmode="decimal" min="0" step="any" id="scoreInput" placeholder="Today's result" aria-label="Today's result"><button class="btn ghost" data-a="score">Log it</button></div>` : '';
   return `<p class="tag c-${d.cat}">${CATS[d.cat].label} · ${esc(d.sub)}</p><h2>${esc(d.title)}</h2>
-    <div class="glance"><span class="g-time">${d.mins} min</span>${doneTag(allStats().tried[d.id] || 0)}${d.gear.map((g) => `<span class="g-gear">${esc(g)}</span>`).join('')}</div>
+    <div class="glance"><span class="g-time">${d.mins} min</span>${doneTag(doneN)}${doneN ? '<button class="undo" data-a="undodone">Mark one as not done</button>' : ''}${d.gear.map((g) => `<span class="g-gear">${esc(g)}</span>`).join('')}</div>
     <p class="lead">${esc(d.why)}</p>
     ${diagram(d.diagram)}
     <h3>${isIq ? 'Key ideas' : 'How to do it'}</h3><ol class="${isIq ? 'ideas' : ''}">${d.how.map((h) => `<li>${esc(h)}</li>`).join('')}</ol>
@@ -707,6 +713,14 @@ const A = {
     document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
   },
   daytip(d) { toast(d.t); },
+  undodone() {
+    const id = ui.sheet.id;
+    if (!(allStats().tried[id] > 0)) return;
+    const r = (state.drill[id] = state.drill[id] || {});
+    r.adj = (r.adj || 0) - 1; save();
+    const y = $('.panelsheet').scrollTop; render(); $('.panelsheet').scrollTop = y;
+    toast('Took one off the count.');
+  },
   importok() { const s = ui.sheet.payload; ui.sheet = null; adopt(s); toast('Backup file loaded.'); },
 };
 
